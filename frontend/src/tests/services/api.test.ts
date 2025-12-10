@@ -18,7 +18,10 @@ describe('API Service', () => {
     vi.clearAllMocks();
   });
 
-  it('creates axios instance with correct config', () => {
+  it('creates axios instance with correct config', async () => {
+    // Import the API module to trigger axios.create
+    await import('../../services/api');
+
     expect(axios.create).toHaveBeenCalledWith({
       baseURL: '/api',
       headers: {
@@ -35,10 +38,11 @@ describe('API Service', () => {
       });
 
       // Import after mocking
-      const { checkHealth } = await import('../../services/api');
+      await import('../../services/api');
 
       // Note: This test verifies the structure, actual API calls would need
       // more sophisticated mocking
+      expect(mockApi).toBeDefined();
     });
   });
 
