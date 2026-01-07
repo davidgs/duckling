@@ -33,6 +33,28 @@ Extract text from scanned documents and images.
 | **macOS Vision** | Native Apple OCR | Apple Neural Engine | Mac users |
 | **RapidOCR** | Fast, lightweight | No | Speed-critical |
 
+### Automatic Backend Installation
+
+Duckling can automatically install OCR backends when you select them:
+
+1. Open **Settings** panel
+2. Select an OCR backend from the dropdown
+3. If the backend is not installed, you'll see an **Install** button
+4. Click to automatically install via pip
+
+!!! note "Installation Requirements"
+    - **EasyOCR, OcrMac, RapidOCR**: Can be installed automatically via pip
+    - **Tesseract**: Requires system-level installation first:
+      - macOS: `brew install tesseract`
+      - Ubuntu/Debian: `apt-get install tesseract-ocr`
+      - Windows: Download from [GitHub releases](https://github.com/UB-Mannheim/tesseract/wiki)
+
+The Settings panel shows the status of each backend:
+
+- ✓ **Installed and ready** - Backend is available for use
+- ⚠ **Not installed** - Click to install (pip-installable backends)
+- ℹ **Requires system installation** - Follow manual installation instructions
+
 ### Language Support
 
 28+ languages including:
@@ -90,6 +112,19 @@ Extract embedded images from documents.
 | Generate Picture Images | Extract pictures as files |
 | Generate Table Images | Extract tables as images |
 | Image Scale | Output scale factor (0.1x - 4.0x) |
+
+### Image Preview Gallery
+
+After conversion, extracted images are displayed in a visual gallery:
+
+- **Thumbnail Grid**: View all images as thumbnails in a responsive grid
+- **Hover Actions**: Quick access to view and download buttons on hover
+- **Lightbox Viewer**: Click any image to view full-size in a modal
+- **Navigation**: Use arrow buttons to browse through multiple images
+- **Download**: Download individual images directly from the gallery or lightbox
+
+!!! tip "Image Formats"
+    All extracted images are saved as PNG format for maximum compatibility.
 
 ## RAG Chunking
 

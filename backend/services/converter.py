@@ -142,42 +142,55 @@ class ConverterService:
         force_full_page_ocr = ocr_settings.get("force_full_page_ocr", False)
         bitmap_area_threshold = ocr_settings.get("bitmap_area_threshold", 0.05)
 
+        print(f"[OCR] Configuring OCR backend: {backend}, language: {language}, force_full_page: {force_full_page_ocr}")
+
         # Map language code
         easyocr_lang = EASYOCR_LANGUAGE_MAP.get(language, "en")
 
-        if backend == "easyocr":
-            return EasyOcrOptions(
-                lang=[easyocr_lang],
-                force_full_page_ocr=force_full_page_ocr,
-                use_gpu=ocr_settings.get("use_gpu", False),
-                confidence_threshold=ocr_settings.get("confidence_threshold", 0.5),
-                bitmap_area_threshold=bitmap_area_threshold,
-            )
-        elif backend == "tesseract":
-            return TesseractOcrOptions(
-                lang=[language],  # Tesseract uses standard language codes
-                force_full_page_ocr=force_full_page_ocr,
-                bitmap_area_threshold=bitmap_area_threshold,
-            )
-        elif backend == "ocrmac":
-            return OcrMacOptions(
-                lang=[language],
-                force_full_page_ocr=force_full_page_ocr,
-                bitmap_area_threshold=bitmap_area_threshold,
-            )
-        elif backend == "rapidocr":
-            return RapidOcrOptions(
-                lang=[language],
-                force_full_page_ocr=force_full_page_ocr,
-                bitmap_area_threshold=bitmap_area_threshold,
-            )
-        else:
-            # Default to EasyOCR
-            return EasyOcrOptions(
-                lang=[easyocr_lang],
-                force_full_page_ocr=force_full_page_ocr,
-                use_gpu=False,
-            )
+        try:
+            if backend == "easyocr":
+                print(f"[OCR] Creating EasyOCR options with lang={easyocr_lang}")
+                return EasyOcrOptions(
+                    lang=[easyocr_lang],
+                    force_full_page_ocr=force_full_page_ocr,
+                    use_gpu=ocr_settings.get("use_gpu", False),
+                    confidence_threshold=ocr_settings.get("confidence_threshold", 0.5),
+                    bitmap_area_threshold=bitmap_area_threshold,
+                )
+            elif backend == "tesseract":
+                print(f"[OCR] Creating Tesseract options with lang={language}")
+                return TesseractOcrOptions(
+                    lang=[language],  # Tesseract uses standard language codes
+                    force_full_page_ocr=force_full_page_ocr,
+                    bitmap_area_threshold=bitmap_area_threshold,
+                )
+            elif backend == "ocrmac":
+                print(f"[OCR] Creating OcrMac options with lang={language}")
+                return OcrMacOptions(
+                    lang=[language],
+                    force_full_page_ocr=force_full_page_ocr,
+                    bitmap_area_threshold=bitmap_area_threshold,
+                )
+            elif backend == "rapidocr":
+                print(f"[OCR] Creating RapidOCR options with lang={language}")
+                return RapidOcrOptions(
+                    lang=[language],
+                    force_full_page_ocr=force_full_page_ocr,
+                    bitmap_area_threshold=bitmap_area_threshold,
+                )
+            else:
+                # Default to EasyOCR
+                print(f"[OCR] Unknown backend '{backend}', defaulting to EasyOCR")
+                return EasyOcrOptions(
+                    lang=[easyocr_lang],
+                    force_full_page_ocr=force_full_page_ocr,
+                    use_gpu=False,
+                )
+        except Exception as e:
+            print(f"[OCR] Error creating OCR options for {backend}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def _get_table_options(self, settings: Dict[str, Any]) -> TableStructureOptions:
         """Create table structure options based on settings."""
@@ -244,7 +257,11 @@ class ConverterService:
 
         # Configure OCR options if enabled
         if ocr_enabled:
+            print(f"[converter] OCR is enabled, configuring OCR options...")
             pipeline_options.ocr_options = self._get_ocr_options(settings)
+            print(f"[converter] OCR options configured: {type(pipeline_options.ocr_options).__name__}")
+        else:
+            print(f"[converter] OCR is disabled")
 
         # Configure table structure options
         if table_enabled:
@@ -259,6 +276,8 @@ class ConverterService:
             pipeline_options=pipeline_options,
         )
 
+        print(f"[converter] Creating DocumentConverter...")
+
         # Create converter with format options for all supported formats
         converter = DocumentConverter(
             format_options={
@@ -266,6 +285,8 @@ class ConverterService:
                 InputFormat.IMAGE: image_format_option,
             }
         )
+
+        print(f"[converter] DocumentConverter created successfully")
 
         # Cache the converter
         self._converters[settings_hash] = converter
@@ -525,8 +546,20 @@ class ConverterService:
                 result = converter.convert(job.input_path)
             except Exception as ocr_error:
                 error_str = str(ocr_error)
-                # Check if it's an OCR-related error
-                if "meta tensor" in error_str or "EasyOCR" in error_str or "OCR" in error_str:
+                print(f"[converter] Conversion error: {error_str}")
+                import traceback
+                traceback.print_exc()
+
+                # Check if it's an OCR-related error that we should retry without OCR
+                ocr_error_indicators = [
+                    "meta tensor", "EasyOCR", "tesseract", "ocrmac", "rapidocr",
+                    "OCR", "OcrOptions", "No module named", "cannot import",
+                    "CUDA", "cuda", "GPU", "gpu"
+                ]
+                is_ocr_error = any(indicator.lower() in error_str.lower() for indicator in ocr_error_indicators)
+
+                if is_ocr_error:
+                    print(f"[converter] OCR error detected, retrying without OCR...")
                     job.message = "OCR failed, retrying without OCR..."
                     job.progress = 25
 
@@ -540,7 +573,9 @@ class ConverterService:
                         job.progress = 30
                         result = converter.convert(job.input_path)
                         job.message = "Converted without OCR (OCR initialization failed)"
+                        print(f"[converter] Successfully converted without OCR")
                     except Exception as fallback_error:
+                        print(f"[converter] Fallback conversion also failed: {fallback_error}")
                         conversion_error = fallback_error
                 else:
                     conversion_error = ocr_error
@@ -698,23 +733,56 @@ class ConverterService:
 
         try:
             # Iterate through all pages
-            for page in result.pages:
-                if page.predictions and page.predictions.layout:
-                    # Get confidence from each cluster in the layout prediction
-                    for cluster in page.predictions.layout.clusters:
-                        if hasattr(cluster, 'confidence') and cluster.confidence is not None:
-                            confidences.append(cluster.confidence)
-                        # Also check children clusters
-                        if hasattr(cluster, 'children'):
-                            for child in cluster.children:
-                                if hasattr(child, 'confidence') and child.confidence is not None:
-                                    confidences.append(child.confidence)
+            if hasattr(result, 'pages'):
+                for page in result.pages:
+                    # Try multiple ways to access confidence based on Docling version
+                    if hasattr(page, 'predictions') and page.predictions:
+                        predictions = page.predictions
+
+                        # Try layout predictions
+                        if hasattr(predictions, 'layout') and predictions.layout:
+                            layout = predictions.layout
+                            if hasattr(layout, 'clusters'):
+                                for cluster in layout.clusters:
+                                    if hasattr(cluster, 'confidence') and cluster.confidence is not None:
+                                        confidences.append(cluster.confidence)
+                                    # Also check children clusters
+                                    if hasattr(cluster, 'children'):
+                                        for child in cluster.children:
+                                            if hasattr(child, 'confidence') and child.confidence is not None:
+                                                confidences.append(child.confidence)
+
+                        # Try OCR predictions if available
+                        if hasattr(predictions, 'ocr') and predictions.ocr:
+                            ocr = predictions.ocr
+                            if hasattr(ocr, 'cells'):
+                                for cell in ocr.cells:
+                                    if hasattr(cell, 'confidence') and cell.confidence is not None:
+                                        confidences.append(cell.confidence)
+
+                    # Also try page-level confidence
+                    if hasattr(page, 'confidence') and page.confidence is not None:
+                        confidences.append(page.confidence)
+
+            # Also check document-level metadata for confidence
+            if hasattr(result, 'document') and result.document:
+                doc = result.document
+                if hasattr(doc, 'metadata') and doc.metadata:
+                    meta = doc.metadata
+                    if hasattr(meta, 'confidence') and meta.confidence is not None:
+                        confidences.append(meta.confidence)
 
             if confidences:
-                return sum(confidences) / len(confidences)
+                avg_confidence = sum(confidences) / len(confidences)
+                print(f"[confidence] Found {len(confidences)} confidence values, average: {avg_confidence:.4f}")
+                return avg_confidence
+            else:
+                print("[confidence] No confidence values found in result")
         except Exception as e:
             # Log the error but don't fail the conversion
             print(f"Error calculating confidence: {e}")
+            import traceback
+            traceback.print_exc()
 
         return None
 

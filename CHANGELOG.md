@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-01-07
+
+### Added
+
+- **Image Preview Gallery**: Extracted images now display as visual thumbnails
+  - Grid layout with actual image previews instead of icons
+  - Hover actions for quick view and download
+  - Full-size lightbox modal with navigation arrows
+  - Click to view full-size image with download option
+  - Keyboard-friendly navigation between images
+
+- **OCR Backend Auto-Installation**: Automatic installation of OCR engines
+  - Settings panel shows installation status for each OCR backend
+  - One-click installation for pip-installable backends (EasyOCR, OcrMac, RapidOCR)
+  - Clear status indicators (✓ installed, not installed, requires system install)
+  - Helpful notes for backends requiring system-level installation (Tesseract)
+  - New API endpoints for backend status and installation:
+    - `GET /api/settings/ocr/backends` - Get status of all backends
+    - `GET /api/settings/ocr/backends/<id>/check` - Check specific backend
+    - `POST /api/settings/ocr/backends/<id>/install` - Install a backend
+
+### Changed
+
+- **Confidence Display**: Improved confidence score handling
+  - Confidence now only displays when valid (non-null, greater than 0)
+  - Better handling of documents without OCR/layout analysis (e.g., markdown files)
+  - Enhanced confidence extraction from Docling results
+
+- **Settings Application**: User settings now properly apply to conversions
+  - Conversion endpoints load saved user settings instead of defaults
+  - OCR backend selection now correctly affects document processing
+
+### Fixed
+
+- **Environment Variables**: Backend now correctly loads `.env` file from the backend directory
+  - Explicit path specification for `load_dotenv()` ensures reliable loading
+  - Debug mode properly controlled by `DEBUG` environment variable
+- **Case-Insensitive File Extensions**: File uploads now accept uppercase extensions (e.g., `.MD`, `.PDF`)
+  - Frontend accepts both uppercase and lowercase extensions
+  - Backend normalizes extensions to lowercase for Docling compatibility
+- **Confidence Score**: Fixed issue where confidence was always showing 0.0%
+  - Now correctly handles `null` confidence values
+  - Hidden for documents without confidence data
+- **OCR Backend Selection**: Changing OCR backend in settings now works correctly
+  - Settings are properly loaded and applied during conversion
+
 ## [2.3.0] - 2026-01-07
 
 ### Changed
